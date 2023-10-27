@@ -1,6 +1,6 @@
 // シートをグローバル化
-var targetSpreadsheetId = "1y0Jgdud4yon6h4LuPNkR7VFh98yppg2vGBpMVhaHW5k"; // 目標のスプレッドシートのIDを指定
-var targetSheetName = "調整"; // 目標のシート名を指定
+var targetSpreadsheetId = "Sheet ID"; // 目標のスプレッドシートのIDを指定
+var targetSheetName = "Sheet Name"; // 目標のシート名を指定
 var targetSpreadsheet = SpreadsheetApp.openById(targetSpreadsheetId);
 var targetSheet = targetSpreadsheet.getSheetByName(targetSheetName);
 
