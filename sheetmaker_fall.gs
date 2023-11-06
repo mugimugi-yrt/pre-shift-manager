@@ -3,8 +3,7 @@ var targetSpreadsheetId = "Sheet ID"; // 使用スプレッドシートのID
 var targetSheetName = "Sheet Name"; // 調整表作成シート名を指定
 var targetSpreadsheet = SpreadsheetApp.openById(targetSpreadsheetId);
 var targetSheet = targetSpreadsheet.getSheetByName(targetSheetName);
-
-// ここがmain関数
+// ここがフォーム受信時に実行されるmain関数
 // フォームが提出された時のシート作成(要フォーム受信トリガー)
 function onFormSubmit(e) {
   var formResponses = e.values;
@@ -207,24 +206,36 @@ function makeNameMenu(grades, names, num) {
   return grades;
 }
 
-// 決定版が作成完了した後のリセット(要変更時トリガー)
-function endEditShift(e) {
+// ここが変更時に実行されるmain関数
+// フォームが提出された時のシート作成(要変更時トリガー)
+function onCheck(e) {
   var sheet = e.source.getActiveSheet(); // 編集されたシートを取得
   var range = e.source.getActiveRange();
   var col = range.getColumn();
   var row = range.getRow();
   var cellValue = range.getValue();
-  var previousValue = e.oldValue; // 前回のセルの値
 
-  // シート名が「調整表」の「G41」でない場合は処理をスキップ
-  if (sheet.getName() === "調整表" && col === 7 && row === 41) {
-    // 変更がない場合は処理をスキップ
-    if (cellValue === previousValue) { return; }
+  // 編集されたシートが調整表でなければ、実行終了
+  if (sheet.getName() !== targetSheetName) { return; }
+
+  // 確定版処理
+  if (col === 7 && row === 41) { endEditShift(); }
+
+  // 各アップデート
+  else if (row >= 5 && row <= 19) {
+    // 名前表示アップデート
+    if      (col === 10) { updateSheet(0, row, col, cellValue); }
+    else if (col === 13) { updateSheet(1, row, col, cellValue); }
+    else if (col === 16) { updateSheet(2, row, col, cellValue); }
+    // プルダウンアップデート
+    else if (col === 11 || col === 14 || col === 17) { makePulldown(); }
   }
-  else { return; }
+}
 
+// 決定版が作成完了した後のリセット
+function endEditShift() {
   // G41のセルのチェックボックスを判定
-  var box = targetSheet.getRange("G41");
+  var checkBox = targetSheet.getRange("G41");
   var check = box.getValue();
 
   if (check === true) {
@@ -253,91 +264,29 @@ function endEditShift(e) {
       range.clearDataValidations();
     }
   }
-  box.setValue(false);
+  checkBox.setValue(false);
 }
 
 // 名前表示にチェックが付いたときの更新(要変更時トリガー)
-function updateSheet(e) {
-  var column = ["C", "D", "E", "F", "G"];
-  var sheet = e.source.getActiveSheet(); // 編集されたシートを取得
-  var range = e.source.getActiveRange();
-  var col = range.getColumn();
-  var row = range.getRow();
-  var cellValue = range.getValue();
-  var previousValue = e.oldValue; // 前回のセルの値
-
-  // シート名が「調整表」の「J5:J19」「M5:M19」「P5:P19」でない場合は処理をスキップ
-  if (sheet.getName() === "調整表" && row >= 5 && row <= 19) {
-    if (col === 10 || col === 13 || col === 16) {
-      // 変更がない場合は処理をスキップ
-      if (cellValue === previousValue) { return; }
-    }
-    else { return; }
-  }
-  else { return; }
-
-  if      (col === 10) { var i = 0; }
-  else if (col === 13) { var i = 1; }
-  else if (col === 16) { var i = 2; }
-
-  var checkCell = targetSheet.getRange(row, col).isChecked();
+function updateSheet(gnum, row, col, tf) {
   var fullName = targetSheet.getRange(row, col - 1).getValue();
   var lastName = fullName.split(' ')[0];
-  if (checkCell === true) {
-    for (var n = 0; n < column.length; n++) {
-      for (var m = 0; m <= 5; m++) {
-        var num = 3 * (m + 1) + i;
-        var nameListCell = targetSheet.getRange(column[n] + String(num));
-        var nameList = nameListCell.getValue().split(',');
-        var updateText = "";
-        for (var x = 0; x < nameList.length; x++) {
-          if (nameList[x].trim() === lastName) { nameList[x] = fullName; }
-          if (x === 0) { updateText = nameList[x].trim(); }
-          else { updateText = updateText.trim() + ', ' + nameList[x].trim();}
-        }
-        nameListCell.setValue(updateText);
+  var names = [lastName, fullName];
+  var oldName = tf ? 0 : 1;
+  var newName = tf ? 1 : 0;
+
+  for (var i = 3; i <= 7; i++) {
+    for (var j = 0; j <= 5; j++) {
+      var num = 3 * (j + 1) + gnum;
+      var nameListCell = targetSheet.getRange(num, i);
+      var nameList = nameListCell.getValue().split(',');
+      var updateText = "";
+      for (var n = 0; n < nameList.length; n++) {
+        if (nameList[n].trim() === names[oldName]) { nameList[n] = names[newName]; }
+        if (n === 0) { updateText = nameList[n].trim(); }
+        else { updateText = updateText + ', ' + nameList[n].trim();}
       }
+      nameListCell.setValue(updateText);
     }
-  }
-  else if (checkCell === false) {
-    // チェックが外された時、名前を苗字表記に変更
-    for (var n = 0; n < column.length; n++) {
-      for (var m = 0; m <= 5; m++) {
-        var num = 3 * (m + 1) + i;
-        var nameListCell = targetSheet.getRange(column[n] + String(num));
-        var nameList = nameListCell.getValue().split(',');
-        var updateText = "";
-        for (var x = 0; x < nameList.length; x++) {
-          if (nameList[x].trim() === fullName) { nameList[x] = lastName; }
-          if (x === 0) { updateText = nameList[x].trim(); }
-          else { updateText = updateText.trim() + ', ' + nameList[x].trim(); }
-        }
-        nameListCell.setValue(updateText);
-      }
-    }
-  }     
-}
-
-// 決定表示にチェックが付いたときのプルダウン更新(要変更時トリガー)
-function updatePulldown(e) {
-  var sheet = e.source.getActiveSheet(); // 編集されたシートを取得
-  var range = e.source.getActiveRange();
-  var col = range.getColumn();
-  var row = range.getRow();
-  var cellValue = range.getValue();
-  var previousValue = e.oldValue; // 前回のセルの値
-
-  // シート名が「調整表」の「K5:K19」「N5:N19」「Q5:Q19」でない場合は処理をスキップ
-  if (sheet.getName() === "調整表" && row >= 5 && row <= 19) {
-    if (col === 11 || col === 14 || col === 17) {
-      // 変更がない場合は処理をスキップ
-      if (cellValue === previousValue) { return; }
-    }
-    else { return; }
-  }
-  else { return; }
-
-  var checkCell = targetSheet.getRange(row, col);
-  if      (checkCell.isChecked() === true)  { makePulldown(); }
-  else if (checkCell.isChecked() === false) { makePulldown(); }
+  }   
 }
